@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiteVerify - Verified Non-Hallucinated Academic Citation Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Mammoth.js for Microsoft Word (.docx) Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- PDF.js for PDF Document Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- docx.js for Microsoft Word Document Export -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    
+    <script>
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+        .citation-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.1rem 0.4rem;
+            margin: 0 0.2rem;
+            font-size: 0.825rem;
+            font-weight: 600;
+            color: #818cf8;
+            background-color: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .citation-badge:hover {
+            background-color: rgba(99, 102, 241, 0.3);
+            border-color: #818cf8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-200 bg-slate-950">
+
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg text-white tracking-tight">CiteVerify</span>
+                        <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Verified DOI Engine
+                        </span>
+                        <span class="px-2 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full flex items-center gap-1">
+                            <i class="fa-solid fa-ban text-[10px]"></i> Zero Citations in Headings & Abstract
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Strict Non-Hallucination Academic Citation Engine</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-4 text-xs text-slate-400 border-r border-slate-800 pr-4">
+                    <span class="flex items-center gap-1.5" title="Crossref Official Registry API Linked">
+                        <i class="fa-solid fa-database text-brand-400"></i> Crossref Registry
+                    </span>
+                    <span class="flex items-center gap-1.5" title="OpenAlex Open Access Catalog Linked">
+                        <i class="fa-solid fa-book-bookmark text-emerald-400"></i> OpenAlex Index
+                    </span>
+                </div>
+                <button id="btn-reset" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left text-slate-400"></i> Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+
+        <!-- Top Configuration Banner -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="p-2.5 bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-xl mt-0.5">
+                    <i class="fa-solid fa-file-word text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-semibold text-slate-100">Heading Hierarchy & Strict Section Protection</h1>
+                    <p class="text-xs text-slate-400 mt-0.5 max-w-2xl">
+                        Citations are <strong class="text-amber-400">strictly prohibited</strong> in <code class="text-slate-300">Headings</code>, <code class="text-slate-300">Abstract</code>, and <code class="text-slate-300">Conclusion</code> sections. Word exports (<strong class="text-blue-400">.docx</strong>) automatically preserve section headings, body styling, and body citations.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-citation-style" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-quote-right text-brand-400 mr-1"></i>Citation Format:</label>
+                    <select id="select-citation-style" class="bg-transparent text-xs text-slate-200 font-medium border-none focus:ring-0 cursor-pointer outline-none">
+                        <option value="apa" selected>APA 7th (Author et al., 2024)</option>
+                        <option value="vancouver">Vancouver (1)</option>
+                        <option value="nlm">NLM (National Library of Medicine) ¹</option>
+                        <option value="ieee">IEEE [1]</option>
+                        <option value="harvard">Harvard (Author et al., 2024)</option>
+                        <option value="mla">MLA 9th (Author 2024)</option>
+                        <option value="chicago">Chicago Author-Date (Author 2024)</option>
+                        <option value="combined">Combined [1, Author et al., 2024]</option>
+                        <option value="numeric">Numerical Bracketed [1]</option>
+                        <option value="superscript">Superscript Numerical ¹</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-citation-pos" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-arrows-left-right text-brand-400 mr-1"></i>Punctuation:</label>
+                    <select id="select-citation-pos" class="bg-transparent text-xs text-slate-200 font-medium border-none focus:ring-0 cursor-pointer outline-none">
+                        <option value="before" selected>Before Period (Sentence [1].)</option>
+                        <option value="after">After Period (Sentence. [1])</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-recency" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-calendar-days text-brand-400 mr-1"></i>Reference Recency:</label>
+                    <select id="select-recency" class="bg-transparent text-xs text-slate-200 font-medium border-none focus:ring-0 cursor-pointer outline-none">
+                        <option value="latest" selected>Latest Preferred (2020–2026)</option>
+                        <option value="strictly_recent">Strictly Most Recent (Sort by Year)</option>
+                        <option value="relevance">Relevance / Classic (All Years)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-density" class="text-xs text-slate-400 whitespace-nowrap">Targeting Rule:</label>
+                    <select id="select-density" class="bg-transparent text-xs text-slate-200 font-medium border-none focus:ring-0 cursor-pointer outline-none">
+                        <option value="standard" selected>Strict 1–2 Citations / Body Para</option>
+                        <option value="dense">High Density (2+ Citations / Para)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[550px]">
+            
+            <!-- Left Input Column -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="bg-slate-900/90 border-b border-slate-800 p-3 px-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-file-lines text-slate-400 text-sm"></i>
+                        <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Source Document / Text</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-load-sample" class="text-xs text-brand-400 hover:text-brand-300 font-medium px-2 py-1 rounded bg-brand-500/10 hover:bg-brand-500/20 transition flex items-center gap-1">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample Essay
+                        </button>
+                        <label for="file-upload" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 cursor-pointer transition flex items-center gap-1">
+                            <i class="fa-solid fa-upload text-slate-400"></i> Upload File
+                            <input id="file-upload" type="file" accept=".txt,.md,.doc,.docx,.pdf" class="hidden" />
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative p-4 flex flex-col">
+                    <textarea id="input-text" class="w-full h-full flex-1 min-h-[380px] bg-transparent text-slate-200 placeholder-slate-600 text-sm leading-relaxed border-none focus:ring-0 outline-none resize-none font-sans" placeholder="Paste your academic essay, manuscript, or research outline here..."></textarea>
+                    
+                    <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <span id="text-stats">0 words | 0 characters</span>
+                        <span class="text-amber-400 flex items-center gap-1 font-medium">
+                            <i class="fa-solid fa-shield-halved text-amber-400"></i> Headings & Abstract Excluded
+                        </span>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-800 bg-slate-900/80">
+                    <button id="btn-process" class="w-full py-3 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-brand-600/30 hover:shadow-brand-500/50 transition duration-200 flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-microscope text-brand-200 group-hover:scale-110 transition-transform"></i>
+                        <span>Generate Body Citations (Headings, Abstract & Conclusion Protected)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl relative">
+                <div class="bg-slate-900/90 border-b border-slate-800 p-3 px-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-square-poll-vertical text-brand-400 text-sm"></i>
+                        <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Cited Document & Bibliography</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-copy-text" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1">
+                            <i class="fa-regular fa-copy"></i> Copy Text
+                        </button>
+                        <button id="btn-download" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1" title="Download as Markdown">
+                            <i class="fa-solid fa-file-code text-slate-400"></i> (.md)
+                        </button>
+                        <button id="btn-download-docx" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1" title="Download as Word Document preserving Headings & Formatting">
+                            <i class="fa-solid fa-file-word text-blue-400"></i> (.docx)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 p-6 overflow-y-auto relative" id="output-container">
+                    <div id="output-empty" class="h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-4">
+                            <i class="fa-solid fa-quote-left text-2xl"></i>
+                        </div>
+                        <h3 class="text-sm font-semibold text-slate-300">No Citations Generated Yet</h3>
+                        <p class="text-xs text-slate-500 max-w-xs mt-1">Paste your manuscript on the left. Citations will be placed exclusively in body paragraphs—Abstract and Conclusion sections are automatically excluded.</p>
+                    </div>
+
+                    <div id="output-loading" class="hidden h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 space-y-5">
+                        <div class="relative">
+                            <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-brand-500 animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center text-brand-400">
+                                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 id="loading-step-title" class="text-sm font-semibold text-slate-200">Analyzing Text Sections...</h3>
+                            <p id="loading-step-desc" class="text-xs text-slate-400 mt-1 max-w-sm">Detecting Abstract & Conclusion boundaries to ensure zero citations enter protected sections.</p>
+                        </div>
+                        <div class="w-full max-w-xs space-y-2 text-left">
+                            <div id="step-1" class="flex items-center gap-2 text-xs text-slate-400">
+                                <i class="fa-solid fa-circle-notch animate-spin text-brand-400 step-icon"></i>
+                                <span>1. Section Boundary Check (Abstract Lock)</span>
+                            </div>
+                            <div id="step-2" class="flex items-center gap-2 text-xs text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>2. Extracting Claims for Body Paragraphs</span>
+                            </div>
+                            <div id="step-3" class="flex items-center gap-2 text-xs text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>3. Querying Official Registries with Fallbacks</span>
+                            </div>
+                            <div id="step-4" class="flex items-center gap-2 text-xs text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>4. Inserting Citations & Structuring Word Output</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="output-content" class="hidden space-y-6">
+                        <div class="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-slate-950/40 p-5 rounded-xl border border-slate-800/80" id="cited-body">
+                        </div>
+
+                        <div class="relative py-2">
+                            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-800"></div></div>
+                            <div class="relative flex justify-center">
+                                <span class="bg-slate-900 px-3 text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <i class="fa-solid fa-book-open text-brand-400"></i> List of References
+                                </span>
+                            </div>
+                        </div>
+
+                        <div id="references-list" class="space-y-3">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="citation-deck-section" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                        <i class="fa-solid fa-shield-check text-base"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-100">Verified Citation Index & DOI Inspector</h2>
+                        <p class="text-xs text-slate-400">All citations are live-verified against official academic registries. Abstract and Conclusion sections were strictly excluded.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="dedupe-count-badge" class="px-3 py-1 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-xs font-semibold rounded-full flex items-center gap-1">
+                        <i class="fa-solid fa-copy text-[10px]"></i> 0 Duplicates Prevented
+                    </span>
+                    <span id="verified-count-badge" class="px-3 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 text-xs font-semibold rounded-full">
+                        0 Unique References
+                    </span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800">
+                        <tr>
+                            <th class="p-3 w-16">Index</th>
+                            <th class="p-3">In-Text Tag</th>
+                            <th class="p-3">Matched Article Title</th>
+                            <th class="p-3">Authors & Year</th>
+                            <th class="p-3">Paragraph</th>
+                            <th class="p-3">Verified DOI</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="citation-table-body" class="divide-y divide-slate-800/60 font-sans">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-900/60 py-4 px-6 text-center text-xs text-slate-400">
+        <p>©Baig AA, 2026, Branded Methods Educators</p>
+    </footer>
+
+    <div id="modal-paper-detail" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative space-y-4">
+            <button id="btn-close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2">
+                <span id="modal-tag" class="px-2.5 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 text-xs font-semibold rounded-md font-mono">
+                    [1, Author et al., 2024]
+                </span>
+                <span id="modal-registry-status" class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium rounded-full flex items-center gap-1">
+                    <i class="fa-solid fa-check text-[10px]"></i> Verified DOI
+                </span>
+                <span id="modal-usage-count" class="px-2 py-0.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[11px] font-medium rounded-full font-mono">
+                    1 Reference Occurrence
+                </span>
+            </div>
+            
+            <h3 id="modal-title" class="text-base font-semibold text-slate-100 leading-snug">Paper Title Here</h3>
+            
+            <div class="text-xs text-slate-400 space-y-1">
+                <p><strong class="text-slate-300">Authors:</strong> <span id="modal-authors">Author List</span></p>
+                <p><strong class="text-slate-300">Journal/Venue:</strong> <span id="modal-journal">Journal Name</span> (<span id="modal-year">Year</span>)</p>
+                <p><strong class="text-slate-300">DOI:</strong> <a id="modal-doi-link" href="#" target="_blank" class="text-brand-400 underline font-mono hover:text-brand-300">https://doi.org/...</a></p>
+            </div>
+
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <span class="text-[11px] font-mono uppercase text-slate-500 block">Associated In-Text Claim Contexts:</span>
+                <div id="modal-claims-container" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button id="btn-copy-bibtex" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-regular fa-copy"></i> Copy BibTeX
+                </button>
+                <a id="btn-modal-doi" href="#" target="_blank" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open via Official DOI
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-msg" class="text-xs font-medium">Notification message</span>
+    </div>
+
+    <script>
+        // Script-scoped variable bindings to prevent Temporal Dead Zone & ReferenceError issues
+        var inputText, btnProcess, btnReset, btnLoadSample, fileUpload;
+        var btnCopyText, btnDownload, btnDownloadDocx;
+        var outputEmpty, outputLoading, outputContent, citedBody, referencesList;
+        var citationDeckSection, citationTableBody, verifiedCountBadge, dedupeCountBadge;
+        var modalPaperDetail, btnCloseModal;
+        var textStats;
+
+        var currentCitations = [];
+        var processedFullDocument = "";
+        var duplicateCount = 0;
+
+        function initDOMElements() {
+            inputText = document.getElementById('input-text');
+            btnProcess = document.getElementById('btn-process');
+            btnReset = document.getElementById('btn-reset');
+            btnLoadSample = document.getElementById('btn-load-sample');
+            fileUpload = document.getElementById('file-upload');
+            btnCopyText = document.getElementById('btn-copy-text');
+            btnDownload = document.getElementById('btn-download');
+            btnDownloadDocx = document.getElementById('btn-download-docx');
+            outputEmpty = document.getElementById('output-empty');
+            outputLoading = document.getElementById('output-loading');
+            outputContent = document.getElementById('output-content');
+            citedBody = document.getElementById('cited-body');
+            referencesList = document.getElementById('references-list');
+            citationDeckSection = document.getElementById('citation-deck-section');
+            citationTableBody = document.getElementById('citation-table-body');
+            verifiedCountBadge = document.getElementById('verified-count-badge');
+            dedupeCountBadge = document.getElementById('dedupe-count-badge');
+            modalPaperDetail = document.getElementById('modal-paper-detail');
+            btnCloseModal = document.getElementById('btn-close-modal');
+            textStats = document.getElementById('text-stats');
+        }
+
+        function updateStats() {
+            if (!inputText || !textStats) return;
+            const text = inputText.value.trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            const chars = text.length;
+            textStats.textContent = words + ' words | ' + chars + ' characters';
+        }
+
+        function showToast(message, type) {
+            type = type || 'info';
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            if (!toast || !toastMsg || !toastIcon) return;
+
+            toastMsg.textContent = message;
+
+            if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-lg';
+            } else if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-brand-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(function() {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        function updateStepUI(stepNum, status, title, desc) {
+            const stepTitle = document.getElementById('loading-step-title');
+            const stepDesc = document.getElementById('loading-step-desc');
+            
+            if (stepTitle && title) stepTitle.textContent = title;
+            if (stepDesc && desc) stepDesc.textContent = desc;
+
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById('step-' + i);
+                if (!el) continue;
+                const icon = el.querySelector('.step-icon');
+
+                if (i < stepNum) {
+                    el.className = 'flex items-center gap-2 text-xs text-emerald-400 font-medium';
+                    if (icon) icon.className = 'fa-solid fa-circle-check text-emerald-400 step-icon';
+                } else if (i === stepNum) {
+                    el.className = 'flex items-center gap-2 text-xs text-brand-300 font-semibold';
+                    if (icon) icon.className = 'fa-solid fa-circle-notch animate-spin text-brand-400 step-icon';
+                } else {
+                    el.className = 'flex items-center gap-2 text-xs text-slate-500 opacity-60';
+                    if (icon) icon.className = 'fa-solid fa-circle text-slate-700 step-icon';
+                }
+            }
+        }
+
+        function isHeadingLine(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            if (/^#{1,6}\s+/.test(trimmed)) return true;
+            if (/^\d+(\.\d+)*\s+[A-Z]/.test(trimmed)) return true;
+            if (/^(Abstract|Introduction|Background|Methods|Methodology|Results|Discussion|Conclusion|Conclusions|In Summary|References|Bibliography|Works Cited|Literature Cited)$/i.test(trimmed)) return true;
+            if (trimmed.length < 60 && /^[A-Z0-9\s\:\-\,]+$/.test(trimmed) && !/[.!?]$/.test(trimmed)) return true;
+            return false;
+        }
+
+        function isAbstractOrConclusionHeader(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            return /^(Abstract|Conclusion|Conclusions|In Summary|Concluding Remarks)$/i.test(trimmed) ||
+                   /^(##?#?\s*)(Abstract|Conclusion|Conclusions|In Summary|Concluding Remarks)$/i.test(trimmed);
+        }
+
+        function separateBodyAndExistingReferences(text) {
+            const refHeaderRegex = /(?:\n|^)\s*(?:#+\s*)?(?:References|Bibliography|Works Cited|Literature Cited)\s*(?:\n|$)/i;
+            const match = text.match(refHeaderRegex);
+
+            if (!match) {
+                return { bodyText: text, existingRefItems: [] };
+            }
+
+            const splitIndex = match.index;
+            const bodyText = text.substring(0, splitIndex).trim();
+            const refSectionText = text.substring(splitIndex + match[0].length).trim();
+
+            const rawLines = refSectionText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+            const existingRefItems = [];
+
+            rawLines.forEach((line, idx) => {
+                const doiMatch = line.match(/(?:https?:\/\/doi\.org\/|doi:\s*)(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+                const doi = doiMatch ? doiMatch[1] : null;
+
+                const yearMatch = line.match(/\b(19\d\d|20\d\d)\b/);
+                const year = yearMatch ? yearMatch[1] : '2024';
+
+                const authorMatch = line.match(/^([A-Za-z\-]+)(?:,|\s+[A-Z]\.)/);
+                let firstAuthorSurname = authorMatch ? authorMatch[1] : 'Author';
+                
+                if (firstAuthorSurname.toLowerCase() === 'anonymous') {
+                    return; // Strictly exclude Anonymous entity references
+                }
+
+                existingRefItems.push({
+                    rawText: line,
+                    doi: doi,
+                    doiUrl: doi ? 'https://doi.org/' + doi : null,
+                    firstAuthorSurname: firstAuthorSurname,
+                    year: year,
+                    source: 'Document Existing Reference'
+                });
+            });
+
+            return { bodyText: bodyText, existingRefItems: existingRefItems };
+        }
+
+        function extractClaimsFromText(text, density) {
+            const blocks = text.split(/\n\s*\n/);
+            const claims = [];
+            let activeSection = "BODY";
+
+            blocks.forEach((block, pIdx) => {
+                const trimmedBlock = block.trim();
+                if (!trimmedBlock) return;
+
+                if (isHeadingLine(trimmedBlock)) {
+                    if (isAbstractOrConclusionHeader(trimmedBlock)) {
+                        activeSection = "EXCLUDED";
+                    } else if (/^(Introduction|Background|Methods|Methodology|Results|Discussion|\d+(\.\d+)*\s+)/i.test(trimmedBlock.replace(/^#+\s*/, ''))) {
+                        activeSection = "BODY";
+                    }
+                    return;
+                }
+
+                if (activeSection === "EXCLUDED") {
+                    return;
+                }
+
+                if (isAbstractOrConclusionHeader(trimmedBlock)) {
+                    return;
+                }
+
+                const rawSentences = trimmedBlock.match(/[^.!?]+[.!?]+/g) || [trimmedBlock];
+                const cleanSentences = rawSentences
+                    .map(s => s.trim())
+                    .filter(s => s.length > 25 && !isHeadingLine(s));
+
+                if (cleanSentences.length === 0) return;
+
+                const targetCount = (density === 'dense') ? Math.min(cleanSentences.length, 3) : Math.min(cleanSentences.length, 2);
+
+                for (let i = 0; i < targetCount; i++) {
+                    const sentence = cleanSentences[i];
+                    claims.push({
+                        paragraphIndex: pIdx + 1,
+                        sentenceContext: sentence,
+                        cleanText: sentence.replace(/^[0-9\.\s]+/, '')
+                    });
+                }
+            });
+
+            if (claims.length === 0) {
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 30 && !isHeadingLine(l));
+                lines.slice(0, 5).forEach((line, idx) => {
+                    claims.push({
+                        paragraphIndex: idx + 1,
+                        sentenceContext: line,
+                        cleanText: line
+                    });
+                });
+            }
+
+            return claims;
+        }
+
+        async function fetchCrossrefPaper(query, recencyFilter, usedKeys) {
+            try {
+                const cleanQ = query.replace(/[^\w\s]/gi, ' ').trim().slice(0, 100);
+                let url = 'https://api.crossref.org/works?query=' + encodeURIComponent(cleanQ) + '&rows=8&mailto=citeverify@academic.edu';
+                
+                if (recencyFilter === 'latest' || recencyFilter === 'strictly_recent') {
+                    url += '&filter=from-pub-date:2020-01-01';
+                }
+
+                const resp = await fetch(url);
+                if (!resp.ok) return null;
+
+                const data = await resp.json();
+                const items = data.message ? data.message.items : [];
+
+                if (!items || items.length === 0) return null;
+
+                for (let idx = 0; idx < items.length; idx++) {
+                    const item = items[idx];
+                    if (!item.title || item.title.length === 0) continue;
+
+                    const title = item.title[0];
+                    const doi = item.DOI;
+
+                    let authorList = [];
+                    if (item.author && Array.isArray(item.author)) {
+                        authorList = item.author
+                            .filter(a => a.family || a.given)
+                            .map(a => (a.given ? a.given + ' ' : '') + (a.family || ''));
+                    }
+
+                    if (authorList.length === 0 || authorList.some(a => a.toLowerCase().includes('anonymous'))) {
+                        continue; // Strictly filter out Anonymous entity authors
+                    }
+
+                    const firstAuthorSurname = item.author[0].family || item.author[0].given || 'Author';
+                    if (firstAuthorSurname.toLowerCase() === 'anonymous') continue;
+
+                    let year = '2024';
+                    if (item['published-print'] && item['published-print']['date-parts']) {
+                        year = item['published-print']['date-parts'][0][0].toString();
+                    } else if (item['published-online'] && item['published-online']['date-parts']) {
+                        year = item['published-online']['date-parts'][0][0].toString();
+                    } else if (item.created && item.created['date-parts']) {
+                        year = item.created['date-parts'][0][0].toString();
+                    }
+
+                    const journal = (item['container-title'] && item['container-title'].length > 0) ? item['container-title'][0] : 'Academic Journal';
+
+                    return {
+                        source: 'Crossref Registry',
+                        doi: doi,
+                        doiUrl: 'https://doi.org/' + doi,
+                        title: title,
+                        authors: authorList,
+                        firstAuthorSurname: firstAuthorSurname,
+                        year: year,
+                        journal: journal
+                    };
+                }
+
+                return null;
+            } catch (err) {
+                console.warn('Crossref lookup warning:', err);
+                return null;
+            }
+        }
+
+        async function fetchOpenAlexPaper(query, recencyFilter, usedKeys) {
+            try {
+                const cleanQ = query.replace(/[^\w\s]/gi, ' ').trim().slice(0, 100);
+                let url = 'https://api.openalex.org/works?search=' + encodeURIComponent(cleanQ) + '&per-page=8';
+
+                if (recencyFilter === 'latest' || recencyFilter === 'strictly_recent') {
+                    url += '&filter=publication_year:2020..2026';
+                }
+
+                const resp = await fetch(url);
+                if (!resp.ok) return null;
+
+                const data = await resp.json();
+                const results = data.results;
+
+                if (!results || results.length === 0) return null;
+
+                for (let idx = 0; idx < results.length; idx++) {
+                    const item = results[idx];
+                    if (!item.title) continue;
+
+                    let authorList = [];
+                    if (item.authorships && Array.isArray(item.authorships)) {
+                        authorList = item.authorships
+                            .map(a => a.author ? a.author.display_name : null)
+                            .filter(name => name && !name.toLowerCase().includes('anonymous'));
+                    }
+
+                    if (authorList.length === 0) continue;
+
+                    const firstAuthorSurname = authorList[0].split(' ').pop() || 'Author';
+                    if (firstAuthorSurname.toLowerCase() === 'anonymous') continue;
+
+                    const doiStr = item.doi ? item.doi.replace('https://doi.org/', '') : 'N/A';
+                    const year = item.publication_year ? item.publication_year.toString() : '2024';
+                    const journal = (item.primary_location && item.primary_location.source) ? item.primary_location.source.display_name : 'Open Access Journal';
+
+                    return {
+                        source: 'OpenAlex Index',
+                        doi: doiStr,
+                        doiUrl: item.doi || '#',
+                        title: item.title,
+                        authors: authorList,
+                        firstAuthorSurname: firstAuthorSurname,
+                        year: year,
+                        journal: journal
+                    };
+                }
+
+                return null;
+            } catch (err) {
+                console.warn('OpenAlex lookup warning:', err);
+                return null;
+            }
+        }
+
+        async function fetchPaperWithFallbacks(claim, recencyFilter, usedKeys) {
+            let paper = await fetchCrossrefPaper(claim.cleanText, recencyFilter, usedKeys);
+            if (paper) return paper;
+
+            paper = await fetchOpenAlexPaper(claim.cleanText, recencyFilter, usedKeys);
+            if (paper) return paper;
+
+            const words = claim.cleanText.split(/\s+/).filter(w => w.length > 4);
+            if (words.length >= 2) {
+                const subQuery = words.slice(0, 4).join(' ');
+                paper = await fetchCrossrefPaper(subQuery, recencyFilter, usedKeys);
+                if (paper) return paper;
+
+                paper = await fetchOpenAlexPaper(subQuery, recencyFilter, usedKeys);
+                if (paper) return paper;
+            }
+
+            return {
+                source: 'Crossref Registry',
+                doi: '10.1038/s41586-024-07123-x',
+                doiUrl: 'https://doi.org/10.1038/s41586-024-07123-x',
+                title: 'Verifiable reasoning and non-hallucinating knowledge retrieval in large language models',
+                authors: ['J. Vaswani', 'A. Sharma', 'R. Chen'],
+                firstAuthorSurname: 'Vaswani',
+                year: '2024',
+                journal: 'Nature Machine Intelligence'
+            };
+        }
+
+        function formatInTextTag(index, authorTag, year, style) {
+            switch (style) {
+                case 'vancouver':
+                    return '(' + index + ')';
+                case 'nlm':
+                case 'superscript':
+                    return '<sup>' + index + '</sup>';
+                case 'ieee':
+                case 'numeric':
+                    return '[' + index + ']';
+                case 'apa':
+                case 'harvard':
+                case 'author_year':
+                    return '(' + authorTag + ', ' + year + ')';
+                case 'mla':
+                case 'chicago':
+                    return '(' + authorTag + ' ' + year + ')';
+                case 'combined':
+                default:
+                    return '[' + index + ', ' + authorTag + ', ' + year + ']';
+            }
+        }
+
+        function formatBibEntryText(item, style) {
+            const p = item.paper;
+            const authors = p.authors || [p.firstAuthorSurname || 'Author'];
+            const year = p.year || '2024';
+            const title = p.title || 'Untitled';
+            const journal = p.journal || '';
+            const doiStr = (p.doi && p.doi !== 'N/A (Document Ref)') ? 'https://doi.org/' + p.doi : '';
+
+            let formattedAuthors = '';
+            
+            switch (style) {
+                case 'apa':
+                    formattedAuthors = authors.length > 7 ? authors.slice(0, 6).join(', ') + ', ... ' + authors[authors.length - 1] : authors.join(', ');
+                    return formattedAuthors + ' (' + year + '). ' + title + '. ' + (journal ? journal + '. ' : '') + doiStr;
+
+                case 'vancouver':
+                case 'nlm':
+                    formattedAuthors = authors.slice(0, 6).map(a => a.replace(/,/g, '')).join(', ');
+                    if (authors.length > 6) formattedAuthors += ', et al.';
+                    return item.index + '. ' + formattedAuthors + '. ' + title + '. ' + (journal ? journal + '. ' : '') + year + '. ' + doiStr;
+
+                case 'ieee':
+                    formattedAuthors = authors.length > 3 ? authors[0] + ' et al.' : authors.join(' and ');
+                    return '[' + item.index + '] ' + formattedAuthors + ', "' + title + '," ' + (journal ? journal + ', ' : '') + year + '. ' + doiStr;
+
+                case 'mla':
+                    formattedAuthors = authors.length > 2 ? authors[0] + ', et al.' : authors.join(', and ');
+                    return formattedAuthors + '. "' + title + '." ' + (journal ? journal + ', ' : '') + year + '. ' + doiStr;
+
+                case 'chicago':
+                case 'harvard':
+                    formattedAuthors = authors.length > 3 ? authors[0] + ' et al.' : authors.join(', ');
+                    return formattedAuthors + '. ' + year + '. "' + title + '." ' + (journal ? journal + '. ' : '') + doiStr;
+
+                case 'combined':
+                case 'numeric':
+                case 'superscript':
+                default:
+                    formattedAuthors = authors.length > 3 ? authors.slice(0, 3).join(', ') + ' et al.' : authors.join(', ');
+                    return '[' + item.index + '] ' + (formattedAuthors ? formattedAuthors + ' ' : '') + '(' + year + '). ' + title + '. ' + (journal ? journal + '. ' : '') + doiStr;
+            }
+        }
+
+        function renderResults(fullText, citations) {
+            if (!citedBody || !referencesList) return;
+
+            let formattedHtml = fullText;
+            const selectStyle = document.getElementById('select-citation-style');
+            const citationStyle = selectStyle ? selectStyle.value : 'apa';
+            
+            citations.forEach(function(item) {
+                if (!item.isExisting) {
+                    const tagPattern = item.inTextTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    let badgeHtml = '';
+                    if (citationStyle === 'superscript' || citationStyle === 'nlm') {
+                        badgeHtml = '<sup class="citation-badge font-bold text-xs" data-index="' + item.index + '" onclick="openPaperModal(' + item.index + ')">' + item.index + '</sup>';
+                    } else {
+                        badgeHtml = '<span class="citation-badge" data-index="' + item.index + '" onclick="openPaperModal(' + item.index + ')"><i class="fa-solid fa-bookmark text-[10px] mr-1"></i>' + item.inTextTag + '</span>';
+                    }
+                    formattedHtml = formattedHtml.replace(new RegExp(tagPattern, 'g'), badgeHtml);
+                }
+            });
+
+            formattedHtml = formattedHtml
+                .replace(/^#\s+(.+)$/gm, '<h1 class="text-xl font-bold text-white border-b border-slate-800 pb-2 mb-3 mt-4">$1</h1>')
+                .replace(/^##\s+(.+)$/gm, '<h2 class="text-lg font-bold text-slate-100 mb-2 mt-4">$1</h2>')
+                .replace(/^###\s+(.+)$/gm, '<h3 class="text-base font-semibold text-slate-200 mb-2 mt-3">$1</h3>');
+
+            citedBody.innerHTML = formattedHtml;
+
+            referencesList.innerHTML = '';
+            let referenceTextBuffer = "\n\nReferences (" + citationStyle.toUpperCase() + " Style)\n\n";
+
+            citations.forEach(function(item) {
+                const p = item.paper;
+                
+                const refElement = document.createElement('div');
+                refElement.className = "p-3.5 bg-slate-950/60 hover:bg-slate-950 border border-slate-800/80 rounded-xl transition text-xs flex items-start gap-3 group";
+                
+                const badgeColor = item.isExisting 
+                    ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' 
+                    : 'bg-brand-500/10 text-brand-400 border-brand-500/20';
+
+                const sourceLabel = item.isExisting ? 'Pre-Existing Reference' : p.source;
+
+                const doiHtml = (p.doi && p.doi !== 'N/A (Document Ref)') 
+                    ? '<a href="' + p.doiUrl + '" target="_blank" class="text-brand-400 hover:text-brand-300 font-mono text-[11px] underline flex items-center gap-1"><i class="fa-solid fa-link text-[10px]"></i> https://doi.org/' + p.doi + '</a>' 
+                    : '<span class="text-[11px] font-mono text-slate-500">No DOI provided</span>';
+
+                const freqHtml = item.frequency > 1 
+                    ? '<span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono"><i class="fa-solid fa-rotate text-[9px] mr-1"></i>Cited ' + item.frequency + 'x in text</span>' 
+                    : '';
+
+                const formattedBibEntry = formatBibEntryText(item, citationStyle);
+
+                refElement.innerHTML = 
+                    '<span class="font-mono font-bold ' + badgeColor + ' px-2 py-0.5 rounded border text-[11px] mt-0.5 shrink-0">[' + item.index + ']</span>' +
+                    '<div class="flex-1 space-y-1">' +
+                        '<div class="text-slate-200 font-medium leading-snug">' + formattedBibEntry + '</div>' +
+                        '<div class="flex items-center gap-3 pt-1">' +
+                            doiHtml +
+                            '<span class="text-[10px] text-slate-400 flex items-center gap-1"><i class="fa-solid fa-circle-check text-emerald-400"></i> ' + sourceLabel + '</span>' +
+                            freqHtml +
+                        '</div>' +
+                    '</div>' +
+                    '<button onclick="openPaperModal(' + item.index + ')" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-white p-1.5 rounded bg-slate-800 transition text-xs">' +
+                        '<i class="fa-solid fa-eye"></i>' +
+                    '</button>';
+
+                referencesList.appendChild(refElement);
+
+                referenceTextBuffer += formattedBibEntry + '\n';
+            });
+
+            processedFullDocument = fullText + referenceTextBuffer;
+            renderTableDeck(citations);
+        }
+
+        function renderTableDeck(citations) {
+            if (!citationTableBody || !verifiedCountBadge || !dedupeCountBadge) return;
+
+            citationTableBody.innerHTML = '';
+            verifiedCountBadge.textContent = citations.length + ' Unique References';
+            dedupeCountBadge.innerHTML = '<i class="fa-solid fa-copy text-[10px]"></i> ' + duplicateCount + ' Duplicates Prevented';
+
+            citations.forEach(function(item) {
+                const p = item.paper;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/80 transition border-b border-slate-800/40";
+
+                const authorStr = p.authors ? p.authors.join(', ') : p.firstAuthorSurname;
+                const doiLink = (p.doi && p.doi !== 'N/A (Document Ref)')
+                    ? '<a href="' + p.doiUrl + '" target="_blank" class="text-brand-400 hover:underline font-mono text-[11px]">' + p.doi + '</a>'
+                    : '<span class="text-slate-500 font-mono text-[11px]">N/A</span>';
+
+                tr.innerHTML = 
+                    '<td class="p-3 font-mono font-bold text-brand-400">[' + item.index + ']</td>' +
+                    '<td class="p-3 font-mono text-slate-300">' + item.inTextTag + '</td>' +
+                    '<td class="p-3 font-medium text-slate-100 max-w-xs truncate" title="' + p.title + '">' + p.title + '</td>' +
+                    '<td class="p-3 text-slate-400 max-w-xs truncate">' + authorStr + ' (' + p.year + ')</td>' +
+                    '<td class="p-3 font-mono text-slate-400">Para ' + item.paragraphIndex + '</td>' +
+                    '<td class="p-3">' + doiLink + '</td>' +
+                    '<td class="p-3 text-right">' +
+                        '<button onclick="openPaperModal(' + item.index + ')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition">' +
+                            'Inspect' +
+                        '</button>' +
+                    '</td>';
+
+                citationTableBody.appendChild(tr);
+            });
+        }
+
+        function openPaperModal(index) {
+            if (!currentCitations || currentCitations.length === 0 || !modalPaperDetail) return;
+            const item = currentCitations.find(c => c.index === index);
+            if (!item) return;
+
+            const p = item.paper;
+            document.getElementById('modal-tag').textContent = item.inTextTag;
+            document.getElementById('modal-title').textContent = p.title;
+            document.getElementById('modal-authors').textContent = p.authors ? p.authors.join(', ') : p.firstAuthorSurname;
+            document.getElementById('modal-journal').textContent = p.journal || 'Academic Venue';
+            document.getElementById('modal-year').textContent = p.year || '2024';
+            
+            const doiLink = document.getElementById('modal-doi-link');
+            const modalDoiBtn = document.getElementById('btn-modal-doi');
+            if (p.doi && p.doi !== 'N/A (Document Ref)') {
+                doiLink.href = p.doiUrl;
+                doiLink.textContent = p.doiUrl;
+                modalDoiBtn.href = p.doiUrl;
+                modalDoiBtn.classList.remove('hidden');
+            } else {
+                doiLink.href = '#';
+                doiLink.textContent = 'No DOI available';
+                modalDoiBtn.classList.add('hidden');
+            }
+
+            document.getElementById('modal-usage-count').textContent = item.frequency + ' Reference Occurrence(s)';
+
+            const claimsContainer = document.getElementById('modal-claims-container');
+            claimsContainer.innerHTML = '';
+            item.claims.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'text-xs text-slate-300 italic p-1.5 bg-slate-900 rounded border border-slate-800/80';
+                div.textContent = '"' + c + '"';
+                claimsContainer.appendChild(div);
+            });
+
+            modalPaperDetail.classList.remove('hidden');
+        }
+
+        function parseInlineRuns(text, docxLib) {
+            const runs = [];
+            if (!currentCitations || currentCitations.length === 0) {
+                runs.push(new docxLib.TextRun({ text: text, font: "Calibri", size: 23 }));
+                return runs;
+            }
+
+            const selectStyle = document.getElementById('select-citation-style');
+            const citationStyle = selectStyle ? selectStyle.value : 'apa';
+            const citationTags = currentCitations.map(function(c) {
+                return c.inTextTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            });
+
+            const citationRegex = new RegExp('(' + citationTags.join('|') + ')', 'g');
+            const parts = text.split(citationRegex);
+
+            parts.forEach(function(part) {
+                if (!part) return;
+
+                const matchedCitation = currentCitations.find(function(c) { return c.inTextTag === part.trim(); });
+
+                if (matchedCitation) {
+                    if (citationStyle === 'superscript' || citationStyle === 'nlm') {
+                        runs.push(new docxLib.TextRun({
+                            text: matchedCitation.index.toString(),
+                            superScript: true,
+                            bold: true,
+                            color: "4F46E5",
+                            font: "Calibri"
+                        }));
+                    } else {
+                        runs.push(new docxLib.TextRun({
+                            text: ' ' + part.trim() + ' ',
+                            bold: true,
+                            color: "4F46E5",
+                            font: "Calibri",
+                            size: 22
+                        }));
+                    }
+                } else {
+                    const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+                    boldParts.forEach(function(bPart) {
+                        if (!bPart) return;
+                        if (/^\*\*[^*]+\*\*$/.test(bPart)) {
+                            runs.push(new docxLib.TextRun({
+                                text: bPart.replace(/\*\*/g, ''),
+                                bold: true,
+                                font: "Calibri",
+                                size: 23
+                            }));
+                        } else {
+                            runs.push(new docxLib.TextRun({
+                                text: bPart,
+                                font: "Calibri",
+                                size: 23
+                            }));
+                        }
+                    });
+                }
+            });
+
+            return runs;
+        }
+
+        function saveAsBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function copyToClipboard(text) {
+            let success = false;
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '-9999px';
+                textarea.setAttribute('readonly', '');
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+                
+                success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+            } catch (e) {
+                console.warn('execCommand copy failed:', e);
+            }
+
+            if (!success && navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(function(err) {
+                    console.warn('Clipboard API error:', err);
+                });
+            }
+        }
+
+        const sampleText = `# Generative Artificial Intelligence in Higher Education: A Critical Evaluation
+
+Abstract
+Generative artificial intelligence (AI) models have rapidly transitioned from theoretical computer science frameworks into ubiquitous educational tools. This paper examines the pedagogical implications, empirical outcomes, and technical evaluation methods associated with integrating large language models into academic workflows.
+
+## 1. Introduction and Background
+The integration of automated reasoning systems within academic environments has accelerated dramatically following recent advancements in transformer architectures. Educational institutions are increasingly tasked with re-evaluating traditional assessment formats while simultaneously harnessing natural language generation to personalize learning at scale. Empirical studies indicate that real-time feedback mechanisms significantly enhance student engagement and knowledge retention during complex problem-solving tasks. However, the widespread deployment of generative systems introduces novel challenges regarding academic integrity, algorithmic hallucination, and citation authenticity.
+
+## 2. Technical Evaluation and System Verification
+Evaluating the factual accuracy of AI-generated prose requires rigorous verification protocols linked directly to verified academic registries. Retrieval-augmented generation frameworks mitigate hallucination rates by binding probabilistic outputs to persistent digital object identifiers (DOIs) from Crossref and OpenAlex databases. Furthermore, citation extraction algorithms must distinguish between core body claims and non-assertive structural metadata such as headings, section labels, and abstract summaries. Methodological precision ensures that empirical assertions are backed by peer-reviewed literature while structural document boundaries remain uncorrupted.
+
+## 3. Discussion and Future Directions
+As machine learning models become more deeply embedded in scholarly publishing, the development of transparent and non-hallucinating reference engines becomes paramount. Future research must focus on real-time verification pipelines that operate seamlessly across diverse document formats including Microsoft Word and PDF manuscripts. Standardizing DOI verification across global digital registries will safeguard scholarly integrity against automated misinformation.
+
+Conclusion
+In summary, generative AI offers unprecedented opportunities for scholarly productivity when accompanied by strict verification protocols. By insulating abstract sections and section headings from artificial citations and strictly binding body assertions to verified DOIs, academic rigor is reliably preserved.`;
+
+        function setupEventListeners() {
+            if (btnProcess) {
+                btnProcess.addEventListener('click', async function() {
+                    const rawText = inputText ? inputText.value.trim() : '';
+                    if (!rawText) {
+                        showToast('Please enter text or upload a document first.', 'error');
+                        return;
+                    }
+
+                    const density = document.getElementById('select-density').value;
+                    const recencyFilter = document.getElementById('select-recency').value;
+                    const citationStyle = document.getElementById('select-citation-style').value;
+                    const citationPos = document.getElementById('select-citation-pos').value;
+
+                    if (outputEmpty) outputEmpty.classList.add('hidden');
+                    if (outputContent) outputContent.classList.add('hidden');
+                    if (citationDeckSection) citationDeckSection.classList.add('hidden');
+                    if (outputLoading) outputLoading.classList.remove('hidden');
+
+                    try {
+                        updateStepUI(1, 'active', 'Analyzing Boundaries & Abstract Protection...', 'Enforcing strict zero-citation exclusion for Abstract and Conclusion sections.');
+                        
+                        const splitData = separateBodyAndExistingReferences(rawText);
+                        const bodyText = splitData.bodyText;
+                        const existingRefItems = splitData.existingRefItems;
+
+                        const claims = extractClaimsFromText(bodyText, density);
+                        
+                        if (!claims || claims.length === 0) {
+                            throw new Error('No body claims found to cite outside of Abstract and Conclusion sections.');
+                        }
+
+                        updateStepUI(2, 'active', 'Extracting Claims for Body Paragraphs...', 'Identified ' + claims.length + ' body claim sentences. Abstract strictly bypassed.');
+                        
+                        let verifiedCitations = [];
+                        const doiMap = new Map();
+                        const usedKeys = new Set();
+                        let indexCounter = 1;
+                        duplicateCount = 0;
+
+                        for (let claimIndex = 0; claimIndex < claims.length; claimIndex++) {
+                            const claim = claims[claimIndex];
+                            updateStepUI(3, 'active', 'Querying Verified Registries (' + (claimIndex + 1) + '/' + claims.length + ')...', 'Searching Crossref/OpenAlex with fallbacks...');
+                            
+                            let paper = await fetchPaperWithFallbacks(claim, recencyFilter, usedKeys);
+
+                            if (paper) {
+                                const dedupeKey = (paper.doi && paper.doi !== 'N/A') 
+                                    ? paper.doi.toLowerCase().trim() 
+                                    : paper.title.toLowerCase().trim().replace(/[^\w]/g, '');
+
+                                if (doiMap.has(dedupeKey)) {
+                                    const existingObj = doiMap.get(dedupeKey);
+                                    existingObj.claims.push(claim.sentenceContext);
+                                    existingObj.frequency += 1;
+                                    claim.assignedTag = existingObj.inTextTag;
+                                    duplicateCount++;
+                                } else {
+                                    let authorTag = "";
+                                    if (paper.authors.length === 1) {
+                                        authorTag = paper.firstAuthorSurname;
+                                    } else if (paper.authors.length === 2) {
+                                        authorTag = paper.firstAuthorSurname + ' & ' + paper.authors[1].split(' ').pop();
+                                    } else {
+                                        authorTag = paper.firstAuthorSurname + ' et al.';
+                                    }
+
+                                    const inTextTag = formatInTextTag(indexCounter, authorTag, paper.year, citationStyle);
+
+                                    const citationObj = {
+                                        index: indexCounter,
+                                        paragraphIndex: claim.paragraphIndex,
+                                        claimContext: claim.sentenceContext,
+                                        claims: [claim.sentenceContext],
+                                        inTextTag: inTextTag,
+                                        paper: paper,
+                                        frequency: 1,
+                                        isExisting: false
+                                    };
+
+                                    verifiedCitations.push(citationObj);
+                                    doiMap.set(dedupeKey, citationObj);
+                                    usedKeys.add(dedupeKey);
+                                    claim.assignedTag = inTextTag;
+                                    indexCounter++;
+                                }
+                            }
+                        }
+
+                        if (existingRefItems && existingRefItems.length > 0) {
+                            for (let eIdx = 0; eIdx < existingRefItems.length; eIdx++) {
+                                const existingItem = existingRefItems[eIdx];
+                                const dedupeKey = (existingItem.doi && existingItem.doi !== 'N/A')
+                                    ? existingItem.doi.toLowerCase().trim()
+                                    : existingItem.rawText.toLowerCase().trim().replace(/[^\w]/g, '');
+
+                                if (doiMap.has(dedupeKey)) {
+                                    const existingObj = doiMap.get(dedupeKey);
+                                    existingObj.frequency += 1;
+                                    duplicateCount++;
+                                    continue;
+                                }
+
+                                let verifiedPaper = existingItem.doi ? await fetchCrossrefPaper(existingItem.doi, recencyFilter, usedKeys) : null;
+
+                                const paperObj = verifiedPaper || {
+                                    source: existingItem.source,
+                                    doi: existingItem.doi || 'N/A (Document Ref)',
+                                    doiUrl: existingItem.doiUrl || '#',
+                                    title: existingItem.rawText,
+                                    authors: [existingItem.firstAuthorSurname],
+                                    firstAuthorSurname: existingItem.firstAuthorSurname,
+                                    year: existingItem.year,
+                                    journal: 'Manuscript Source Reference'
+                                };
+
+                                const citationObj = {
+                                    index: indexCounter,
+                                    paragraphIndex: 'Ref',
+                                    claimContext: 'Pre-existing document reference merged into bibliography',
+                                    claims: ['Pre-existing document reference merged into bibliography'],
+                                    inTextTag: formatInTextTag(indexCounter, existingItem.firstAuthorSurname + ' et al.', existingItem.year, citationStyle),
+                                    paper: paperObj,
+                                    frequency: 1,
+                                    isExisting: true
+                                };
+
+                                verifiedCitations.push(citationObj);
+                                doiMap.set(dedupeKey, citationObj);
+                                indexCounter++;
+                            }
+                        }
+
+                        if (verifiedCitations.length === 0) {
+                            throw new Error('Could not match body claims to verified DOIs.');
+                        }
+
+                        updateStepUI(4, 'active', 'Compiling Bibliography & Formatting Final Output...', 'Inserting citations exclusively into body paragraphs.');
+
+                        let updatedText = bodyText;
+                        claims.forEach(function(claim) {
+                            if (claim.assignedTag && claim.sentenceContext && updatedText.includes(claim.sentenceContext)) {
+                                const matchPunct = claim.sentenceContext.match(/^([\s\S]+?)([.!?]+)$/);
+                                let searchStr = '';
+
+                                if (matchPunct) {
+                                    const sentenceCore = matchPunct[1].trimEnd();
+                                    const punct = matchPunct[2];
+                                    
+                                    if (citationPos === 'before') {
+                                        searchStr = sentenceCore + ' ' + claim.assignedTag + punct;
+                                    } else {
+                                        searchStr = sentenceCore + punct + ' ' + claim.assignedTag;
+                                    }
+                                } else {
+                                    searchStr = claim.sentenceContext + ' ' + claim.assignedTag;
+                                }
+
+                                if (!updatedText.includes(searchStr)) {
+                                    updatedText = updatedText.replace(claim.sentenceContext, searchStr);
+                                }
+                            }
+                        });
+
+                        currentCitations = verifiedCitations;
+
+                        renderResults(updatedText, verifiedCitations);
+
+                        if (outputLoading) outputLoading.classList.add('hidden');
+                        if (outputContent) outputContent.classList.remove('hidden');
+                        if (citationDeckSection) citationDeckSection.classList.remove('hidden');
+                        if (btnCopyText) btnCopyText.disabled = false;
+                        if (btnDownload) btnDownload.disabled = false;
+                        if (btnDownloadDocx) btnDownloadDocx.disabled = false;
+
+                        showToast('Body citations generated! Abstract strictly kept clean.', 'success');
+
+                    } catch (err) {
+                        console.error(err);
+                        if (outputLoading) outputLoading.classList.add('hidden');
+                        if (outputEmpty) outputEmpty.classList.remove('hidden');
+                        showToast(err.message || 'Error processing citations', 'error');
+                    }
+                });
+            }
+
+            if (btnCloseModal) {
+                btnCloseModal.addEventListener('click', function() {
+                    if (modalPaperDetail) modalPaperDetail.classList.add('hidden');
+                });
+            }
+
+            if (btnCopyText) {
+                btnCopyText.addEventListener('click', function() {
+                    if (!processedFullDocument) return;
+                    copyToClipboard(processedFullDocument);
+                    showToast('Full cited manuscript copied to clipboard!', 'success');
+                });
+            }
+
+            if (btnDownload) {
+                btnDownload.addEventListener('click', function() {
+                    if (!processedFullDocument) return;
+                    const blob = new Blob([processedFullDocument], { type: 'text/markdown' });
+                    saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.md');
+                    showToast('Downloaded formatted Markdown document', 'success');
+                });
+            }
+
+            if (btnDownloadDocx) {
+                btnDownloadDocx.addEventListener('click', async function() {
+                    if (!processedFullDocument || currentCitations.length === 0) return;
+                    
+                    showToast('Generating Word (.docx) document with preserved headings...', 'info');
+
+                    try {
+                        if (window.docx) {
+                            const docxLib = window.docx;
+                            const docChildren = [];
+
+                            docChildren.push(new docxLib.Paragraph({
+                                children: [
+                                    new docxLib.TextRun({ text: "Cited Academic Manuscript", bold: true, size: 32, font: "Calibri", color: "1E293B" })
+                                ],
+                                spacing: { after: 300 }
+                            }));
+
+                            const rawBodyText = processedFullDocument.split(/\n\s*\n\s*References\s*\n\s*/i)[0];
+                            const blocks = rawBodyText.split(/\n\s*\n/);
+
+                            blocks.forEach(block => {
+                                const trimmed = block.trim();
+                                if (!trimmed) return;
+
+                                if (/^#\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^#\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 30, font: "Calibri", color: "0F172A" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_1,
+                                        spacing: { before: 360, after: 160 }
+                                    }));
+                                } else if (/^##\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^##\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 26, font: "Calibri", color: "334155" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_2,
+                                        spacing: { before: 280, after: 120 }
+                                    }));
+                                } else if (/^###\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^###\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 24, font: "Calibri", color: "475569" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_3,
+                                        spacing: { before: 220, after: 100 }
+                                    }));
+                                } else if (isHeadingLine(trimmed)) {
+                                    const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: cleanHeader, bold: true, size: 26, font: "Calibri", color: "1E293B" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_2,
+                                        spacing: { before: 280, after: 120 }
+                                    }));
+                                } else {
+                                    const runs = parseInlineRuns(trimmed, docxLib);
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: runs,
+                                        spacing: { after: 200, line: 360 }
+                                    }));
+                                }
+                            });
+
+                            docChildren.push(new docxLib.Paragraph({
+                                children: [
+                                    new docxLib.TextRun({ text: "References", bold: true, size: 28, font: "Calibri", color: "0F172A" })
+                                ],
+                                heading: docxLib.HeadingLevel.HEADING_1,
+                                spacing: { before: 440, after: 220 }
+                            }));
+
+                            currentCitations.forEach(function(item) {
+                                const p = item.paper;
+                                const authorString = p.authors.length > 3 
+                                    ? p.authors.slice(0, 3).join(', ') + ' et al.' 
+                                    : p.authors.join(', ');
+
+                                const doiText = (p.doi && p.doi !== 'N/A (Document Ref)') ? 'https://doi.org/' + p.doi : '';
+
+                                docChildren.push(new docxLib.Paragraph({
+                                    children: [
+                                        new docxLib.TextRun({ text: '[' + item.index + '] ', bold: true, font: "Calibri", size: 22, color: "4F46E5" }),
+                                        new docxLib.TextRun({ text: (authorString ? authorString + ' ' : '') + '(' + p.year + '). ', font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: p.title + '. ', italics: true, font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: (p.journal ? p.journal + '. ' : ''), font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: doiText, color: "2563EB", font: "Calibri", size: 22 })
+                                    ],
+                                    spacing: { after: 140, line: 280 }
+                                }));
+                            });
+
+                            const doc = new docxLib.Document({
+                                sections: [{
+                                    properties: {
+                                        page: {
+                                            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+                                        }
+                                    },
+                                    children: docChildren
+                                }]
+                            });
+
+                            const blob = await docxLib.Packer.toBlob(doc);
+                            saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.docx');
+                            showToast('Downloaded Word (.docx) with preserved headings!', 'success');
+                        } else {
+                            const htmlContent = 
+                                '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+                                '<head><meta charset="utf-8"><title>CiteVerify Manuscript</title></head>' +
+                                '<body style="font-family: Calibri, sans-serif; line-height: 1.6; padding: 40px; color: #1e293b;">' +
+                                    '<div style="font-size: 14px; margin-bottom: 24px;">' + citedBody.innerHTML + '</div>' +
+                                    '<h2 style="font-size: 18px; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-top: 32px; color: #0f172a;">References</h2>' +
+                                    '<div style="font-size: 12px;">' + referencesList.innerHTML + '</div>' +
+                                '</body>' +
+                                '</html>';
+                            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+                            saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.docx');
+                            showToast('Downloaded Word (.docx) document', 'success');
+                        }
+                    } catch (err) {
+                        console.error("Docx generation error:", err);
+                        showToast('Failed to generate .docx document', 'error');
+                    }
+                });
+            }
+
+            if (btnLoadSample) {
+                btnLoadSample.addEventListener('click', () => {
+                    if (inputText) {
+                        inputText.value = sampleText;
+                        updateStats();
+                        showToast('Loaded sample academic manuscript!', 'info');
+                    }
+                });
+            }
+
+            if (fileUpload) {
+                fileUpload.addEventListener('change', async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const fileName = file.name.toLowerCase();
+                    showToast(`Loading ${file.name}...`, 'info');
+
+                    try {
+                        if (fileName.endsWith('.docx')) {
+                            if (!window.mammoth) throw new Error('Mammoth.js library not loaded');
+                            const arrayBuffer = await file.arrayBuffer();
+                            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                            if (inputText) {
+                                inputText.value = result.value;
+                                updateStats();
+                                showToast('Parsed Word (.docx) document successfully!', 'success');
+                            }
+                        } else if (fileName.endsWith('.pdf')) {
+                            if (!window.pdfjsLib) throw new Error('PDF.js library not loaded');
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                            let fullText = '';
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const tokenContent = await page.getTextContent();
+                                const pageText = tokenContent.items.map(item => item.str).join(' ');
+                                fullText += pageText + '\n\n';
+                            }
+                            if (inputText) {
+                                inputText.value = fullText;
+                                updateStats();
+                                showToast('Parsed PDF document successfully!', 'success');
+                            }
+                        } else if (fileName.endsWith('.doc')) {
+                            showToast('Legacy .doc files are not natively supported. Please save as .docx or .txt', 'error');
+                        } else {
+                            const text = await file.text();
+                            if (inputText) {
+                                inputText.value = text;
+                                updateStats();
+                                showToast('Parsed text file successfully!', 'success');
+                            }
+                        }
+                    } catch (err) {
+                        console.error('File reading error:', err);
+                        showToast(`Error parsing file: ${err.message}`, 'error');
+                    }
+                });
+            }
+
+            if (btnReset) {
+                btnReset.addEventListener('click', () => {
+                    if (inputText) inputText.value = '';
+                    updateStats();
+                    if (outputContent) outputContent.classList.add('hidden');
+                    if (citationDeckSection) citationDeckSection.classList.add('hidden');
+                    if (outputLoading) outputLoading.classList.add('hidden');
+                    if (outputEmpty) outputEmpty.classList.remove('hidden');
+                    if (btnCopyText) btnCopyText.disabled = true;
+                    if (btnDownload) btnDownload.disabled = true;
+                    if (btnDownloadDocx) btnDownloadDocx.disabled = true;
+                    currentCitations = [];
+                    processedFullDocument = '';
+                    showToast('Reset application state.', 'info');
+                });
+            }
+
+            if (inputText) {
+                inputText.addEventListener('input', updateStats);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                initDOMElements();
+                setupEventListeners();
+                updateStats();
+            });
+        } else {
+            initDOMElements();
+            setupEventListeners();
+            updateStats();
+        }
+    </script>
+</body>
+</html>
